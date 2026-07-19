@@ -1,0 +1,10 @@
+# esto-generated output (not source) — task files and content-addressed context
+# written by `esto run`'s enter/update hooks, regenerated on every run.
+tasks/
+.esto/
+
+# Claude Code local settings — personal permission overrides, not shared.
+.claude/settings.local.json
+
+# Node tooling, if ever added for editor/TS support (e.g. esto types).
+node_modules/
