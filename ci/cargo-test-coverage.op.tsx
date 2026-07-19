@@ -10,7 +10,7 @@
 //   esto run ci/cargo-test-coverage.op.tsx            # emit a task per repo missing the CI step
 //   esto run --dry-run ci/cargo-test-coverage.op.tsx  # list them, write nothing
 import { Context, h, prompt, unit } from 'esto'
-import { CANONICAL_WORKFLOW, GitHubAccount, rustRepoStatus } from '../lib/gh.ts'
+import { CANONICAL_WORKFLOW, GitHubAccount, automationDisclosure, rustRepoStatus } from '../lib/gh.ts'
 
 const OWNER = 'kantord'
 
@@ -35,11 +35,17 @@ exactly this content:
 ${CANONICAL_WORKFLOW}
 \`\`\`
 
-If a Rust workflow already exists there, add a \`cargo test --workspace --all-features\` step to
-it instead of creating a parallel one — match its existing style (checkout/toolchain actions,
-triggers, runner OS) rather than pasting the template verbatim.
+If a Rust workflow already exists there, add a step to it instead of creating a parallel one —
+match its existing style for everything else (checkout/toolchain actions, triggers, runner OS).
+But the test step itself MUST be a literal shell command:
+\`run: cargo test --workspace --all-features\`
+— not an equivalent action wrapper (e.g. NOT \`uses: actions-rs/cargo@v1\` with
+\`command: test\`), even if the rest of the workflow uses that style for other steps. This
+governance script checks for the literal string \`cargo test\` in the workflow file; any other
+way of invoking it won't be recognized as satisfying this invariant on future runs, and the repo
+will incorrectly get flagged again.
 
-Open a PR — don't push to the default branch directly.`,
+${automationDisclosure('ci/cargo-test-coverage.op.tsx')}`,
 })
 
 // TODO: second unit, CIPathFiltered — repos already passing CargoTestCI should also scope

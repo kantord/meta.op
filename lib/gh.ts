@@ -151,3 +151,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-features
 `
+
+// Shared closing instructions for every task prompt in this repo: commit/PR rules plus
+// mandatory disclosure that the change is automated, not human-authored, with provenance
+// pointing back to the EXACT commit of the script that generated it (not just the repo in
+// general, which drifts — a reader auditing this PR later should see precisely which
+// version of the invariant produced it). Every unit()'s enter/update prompt should end with
+// this — it belongs in the prompt itself, not improvised per-execution, since whatever
+// executes the task (a subagent today, something more automated later) should get
+// consistent instructions and consistent wording regardless of who or what is running it.
+export const automationDisclosure = (scriptPath: string): string => {
+  const hash = sh`git rev-parse HEAD`.trim()
+  return `Commit using your normal git identity — don't override author/committer. In BOTH
+the commit message and the PR description, clearly disclose that this change was made fully
+automatically, not by a human, using the script at
+https://github.com/kantord/meta.op/blob/${hash}/${scriptPath} (commit ${hash}).
+
+Open a PR — don't push to the default branch directly.`
+}
