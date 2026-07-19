@@ -42,6 +42,19 @@ triggers, runner OS) rather than pasting the template verbatim.
 Open a PR — don't push to the default branch directly.`,
 })
 
+// TODO: second unit, CIPathFiltered — repos already passing CargoTestCI should also scope
+// their `cargo test` workflow's `on:` triggers to Rust-relevant paths (**/*.rs, **/Cargo.toml,
+// **/Cargo.lock) instead of running on every push. Plan:
+//   - lib/gh.ts: the per-repo workflow-content fetch already happens once (inside what's
+//     currently workflowsContain) — extend it to return a second derived boolean,
+//     hasPathFilter, via a cheap regex (/\bpaths(-ignore)?:/) against that same content. No
+//     new GitHub calls.
+//   - Here: a second unit(), observe() = rustRepoStatus(OWNER).filter(r => r.hasCargoTestCi
+//     && r.hasPathFilter) — mirrors CargoTestCI exactly. Render alongside it per repo:
+//     {(r) => [<CargoTestCI name={r.name} />, <CIPathFiltered name={r.name} />]}.
+//   - Its enter prompt should ask the agent to review the real trigger config and add a
+//     sensible filter — don't try to mechanically validate "is this filter good enough".
+
 export default (): unknown => (
   <Context data={{ note: 'personal GitHub governance: kantord/* Rust repos must run cargo test in CI' }}>
     <GitHubAccount owner={OWNER}>
