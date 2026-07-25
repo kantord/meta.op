@@ -9,7 +9,7 @@
 //     step must be merged into it instead.
 //   esto run ci/cargo-test-coverage.op.tsx            # emit a task per repo missing the CI step
 //   esto run --dry-run ci/cargo-test-coverage.op.tsx  # list them, write nothing
-import { Context, h, prompt, unit } from 'esto'
+import { Context, h, optativeSet, prompt, unit } from 'esto'
 import { CANONICAL_WORKFLOW, GitHubAccount, automationDisclosure, rustRepoStatus } from '../lib/gh.ts'
 import { isInProgress } from '../lib/execState.ts'
 
@@ -26,10 +26,12 @@ const CargoTestCI = unit({
   // "Satisfied" = the invariant actually holds OR a fix is already in flight (state file).
   // Without the second half, re-running while an earlier task is still being worked would
   // just re-emit the same task — see lib/execState.ts for why this lives outside enter().
-  observe: (): RepoTarget[] =>
-    rustRepoStatus(OWNER)
-      .filter((r) => r.hasCargoTestCi || isInProgress(STATE_FILE, r.name))
-      .map((r) => ({ name: r.name })),
+  reconciler: optativeSet({
+    observe: (): RepoTarget[] =>
+      rustRepoStatus(OWNER)
+        .filter((r) => r.hasCargoTestCi || isInProgress(STATE_FILE, r.name))
+        .map((r) => ({ name: r.name })),
+  }),
   enter: (r: RepoTarget) =>
     prompt`\`${OWNER}/${r.name}\` has no CI workflow that runs \`cargo test\`.
 
