@@ -1,17 +1,8 @@
-// lib/execState.ts — minimal execution-state tracking, entirely userland (no esto/optative
-// changes). Closes one specific gap: observe() only knows whether an invariant currently
-// holds, not whether a fix for it is already in flight. Without this, re-running a script
-// while an earlier task is still being worked on (agent hasn't opened/merged its PR yet)
-// would just re-emit the same task again. This is deliberately NOT the full "storage engine
-// per reconciliation border" idea — just the one piece needed to avoid double-dispatching.
-//
-// Marking something in-progress is NOT done automatically by enter() — enter() only emits a
-// prompt, it has no idea whether anything will actually act on it. Marking is a decision the
-// external executor (whatever dispatches agents against tasks/) makes explicitly, once it
-// actually starts working a task. Completion needs no explicit transition: once the real fix
-// lands, the invariant's own observe() check (e.g. hasCargoTestCi) naturally stops matching,
-// which is the reconciler's existing self-healing behavior — this module only needs to stop
-// it from re-triggering in the meantime.
+// lib/execState.ts — userland execution-state tracking (no esto/optative changes). Lets
+// observe() know a fix is already in flight, so a re-run doesn't re-emit the same task while
+// an earlier one is still being worked. Marking is done by the external dispatcher, not by
+// enter() — enter() only emits a prompt, it has no idea if anything acts on it. Completion
+// needs no explicit transition: once the real fix lands, observe()'s own check stops matching.
 import { exists, read, sh } from 'esto'
 
 interface ExecRecord {
@@ -22,6 +13,10 @@ interface ExecRecord {
 
 type ExecState = Record<string, ExecRecord>
 
+// Markers older than this are treated as abandoned (e.g. a dispatched agent crashed and never
+// opened a PR), so the repo isn't hidden from observe() forever.
+const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
+
 const readState = (stateFile: string): ExecState => {
   if (!exists(stateFile)) return {}
   try {
@@ -31,14 +26,21 @@ const readState = (stateFile: string): ExecState => {
   }
 }
 
+// Write-then-rename so a crash mid-write can't leave a truncated state file.
 const writeState = (stateFile: string, state: ExecState): void => {
   const dir = stateFile.slice(0, stateFile.lastIndexOf('/'))
   const json = JSON.stringify(state, null, 2)
-  sh`mkdir -p ${dir} && printf '%s' ${json} > ${stateFile}`
+  const tmpFile = `${stateFile}.new`
+  sh`mkdir -p ${dir} && printf '%s' ${json} > ${tmpFile} && mv ${tmpFile} ${stateFile}`
 }
 
-export const isInProgress = (stateFile: string, key: string): boolean =>
-  readState(stateFile)[key]?.status === 'in-progress'
+const isStale = (record: ExecRecord): boolean =>
+  Date.now() - new Date(record.markedAt).getTime() > STALE_AFTER_MS
+
+export const isInProgress = (stateFile: string, key: string): boolean => {
+  const record = readState(stateFile)[key]
+  return record?.status === 'in-progress' && !isStale(record)
+}
 
 export const markInProgress = (stateFile: string, key: string, prUrl?: string): void => {
   const state = readState(stateFile)
